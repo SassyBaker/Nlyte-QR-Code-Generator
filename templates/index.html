@@ -1,16 +1,29 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="transition-colors duration-300">
 <head>
     <meta charset="UTF-8">
     <title>Nlyte QR Code Generator 😎</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2280%22>😎</text></svg>">
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen relative">
-    <h1 class="text-4xl font-bold mb-6">
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 flex flex-col items-center justify-center min-h-screen relative px-4 py-10">
+
+    <!-- Dark Mode Toggle -->
+    <button onclick="toggleDarkMode()" class="absolute top-4 right-4 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-100 px-4 py-2 rounded shadow text-sm">
+        Toggle Dark Mode
+    </button>
+
+    <h1 class="text-4xl font-bold mb-6 text-center">
         Nlyte QR Code <span class="text-blue-500">Generator</span> 😎
     </h1>
-    <div id="code" class="text-3xl font-mono bg-white p-4 rounded shadow mb-4"></div>
-    <div class="flex space-x-4 mb-2">
+
+    <!-- Code Display -->
+    <div id="code" class="text-3xl font-mono bg-white dark:bg-gray-800 p-4 rounded shadow mb-4 min-w-[12rem] text-center">
+        Loading...
+    </div>
+
+    <!-- Buttons -->
+    <div class="flex flex-wrap justify-center gap-4 mb-4">
         <button onclick="copyToClipboard()" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded">
             Copy to Clipboard
         </button>
@@ -18,32 +31,79 @@
             Generate New Code
         </button>
     </div>
-    <div id="confirmation" class="text-green-600 font-semibold mb-4" style="min-height: 24px;"></div>
 
+    <!-- Confirmation Message -->
+    <div id="confirmation" class="text-green-600 font-semibold mb-4 h-6 text-center"></div>
+
+    <!-- History List -->
     <div class="mt-8 w-full max-w-md">
         <h2 class="text-xl font-semibold mb-2">History</h2>
-        <ul class="bg-white rounded shadow p-4 space-y-2">
+        <ul id="history" class="bg-white dark:bg-gray-800 rounded shadow p-4 space-y-2">
             {% for entry in history %}
-            <li class="flex justify-between text-sm text-gray-700">
+            <li class="flex justify-between text-sm text-gray-700 dark:text-gray-300">
                 <span>{{ entry.code }}</span>
                 <span>{{ entry.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</span>
             </li>
             {% endfor %}
         </ul>
+
+        <!-- Pagination -->
+        {% if pagination.pages > 1 %}
+        <div class="flex justify-center mt-4 space-x-2">
+            {% if pagination.has_prev %}
+            <a href="?q={{ search_query }}&page={{ pagination.prev_num }}" class="px-4 py-2 bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-white rounded hover:bg-gray-400 dark:hover:bg-gray-600">
+                Previous
+            </a>
+            {% endif %}
+
+            <span class="px-4 py-2 text-gray-600 dark:text-gray-300">
+                Page {{ pagination.page }} of {{ pagination.pages }}
+            </span>
+
+            {% if pagination.has_next %}
+            <a href="?q={{ search_query }}&page={{ pagination.next_num }}" class="px-4 py-2 bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-white rounded hover:bg-gray-400 dark:hover:bg-gray-600">
+                Next
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Search & Export Form -->
+        <form method="get" action="/" class="mt-6 w-full flex gap-2">
+            <input
+                type="text"
+                name="q"
+                value="{{ search_query }}"
+                placeholder="Search code..."
+                class="w-full p-2 rounded border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            />
+            <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
+                Search
+            </button>
+            <a href="/export" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded text-center whitespace-nowrap">
+                Export CSV
+            </a>
+        </form>
     </div>
 
+    <!-- JavaScript -->
     <script>
-        async function generateCode() {
-            const response = await fetch('/generate');
-            const data = await response.json();
-            const codeElement = document.getElementById('code');
-            codeElement.textContent = data.code;
-            copyTextToClipboard(data.code);
+        // Theme toggle
+        if (localStorage.getItem('theme') === 'dark') {
+            document.documentElement.classList.add('dark');
+        }
+
+        function toggleDarkMode() {
+            const html = document.documentElement;
+            const isDark = html.classList.toggle('dark');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
         }
 
         function copyToClipboard() {
             const code = document.getElementById('code').textContent;
-            copyTextToClipboard(code);
+            if (code && code !== 'Loading...' && code !== 'Error') {
+                copyTextToClipboard(code);
+            }
         }
 
         function copyTextToClipboard(text) {
@@ -56,7 +116,30 @@
             });
         }
 
-        window.onload = generateCode;
+        async function generateCode() {
+            try {
+                const response = await fetch('/generate');
+                const data = await response.json();
+
+                if (data.code) {
+                    const codeElement = document.getElementById('code');
+                    codeElement.textContent = data.code;
+                    copyTextToClipboard(data.code);
+                }
+            } catch (err) {
+                console.error('Error generating code:', err);
+                document.getElementById('code').textContent = 'Error';
+            }
+        }
+
+        // Only auto-generate a code on first visit (not on paginated/search views)
+        const params = new URLSearchParams(window.location.search);
+        if (!params.has('page') && !params.has('q')) {
+            window.addEventListener('DOMContentLoaded', generateCode);
+        } else {
+            document.getElementById('code').textContent = 'Click "Generate New Code"';
+        }
     </script>
+
 </body>
 </html>
