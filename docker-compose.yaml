@@ -10,10 +10,12 @@ services:
     environment:
       - FLASK_ENV=production
     restart: unless-stopped
-
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
-      interval: 30s
+      test:
+        - CMD
+        - curl
+        - '-f'
+        - 'http://127.0.0.1:5000/health'
+      interval: 2s
       timeout: 10s
-      retries: 3
-      start_period: 5s
+      retries: 10
