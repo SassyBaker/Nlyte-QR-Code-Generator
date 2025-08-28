@@ -19,5 +19,7 @@ COPY . .
 # Expose the port Gunicorn will listen on
 EXPOSE 5000
 
+RUN apt-get install -y curl
+
 # Use Gunicorn as production server
 CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:app", "--workers", "3", "--threads", "2", "--timeout", "120"]
