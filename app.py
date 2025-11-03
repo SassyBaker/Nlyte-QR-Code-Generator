@@ -7,18 +7,25 @@ import io
 import os
 
 app = Flask(__name__)
-# app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///data/codes.db'
 
-basedir = os.path.abspath(os.path.dirname(__file__))
-db_path = os.path.join(basedir, 'data', 'codes.db')
-app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
+# PostgreSQL configuration
+# Option 1: Use environment variable (recommended for production)
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv(
+    'DATABASE_URL',
+    'postgresql://username:password@localhost:5432/codes_db'
+)
+
+# Option 2: Direct configuration (update with your credentials)
+# app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://username:password@localhost:5432/codes_db'
+
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
 
 class CodeEntry(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    code = db.Column(db.String(9), nullable=False)
+    code = db.Column(db.String(20), nullable=False)  # Fixed length for "NeedsQR-XXXXXX"
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
 
@@ -28,9 +35,10 @@ with app.app_context():
 
 def generate_code():
     while True:
-        code = str(random.randint(100000, 999999))
+        code = str(random.randint(1000000, 9999999))
         if not CodeEntry.query.filter_by(code=code).first():
             return f"NeedsQR-{code}"
+
 
 @app.route('/')
 def index():
@@ -68,7 +76,7 @@ def export_csv():
 
     si = io.StringIO()
     cw = csv.writer(si)
-    cw.writerow(['Code', 'Timestamp'])  # Header
+    cw.writerow(['Code', 'Timestamp'])
     for entry in entries:
         cw.writerow([entry.code, entry.timestamp.strftime('%Y-%m-%d %H:%M:%S')])
 

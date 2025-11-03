@@ -1,6 +1,21 @@
 version: "3.9"
 
 services:
+  db:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: codeuser
+      POSTGRES_PASSWORD: codepass123
+      POSTGRES_DB: codes_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U codeuser"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   web:
     build: .
     ports:
@@ -9,7 +24,11 @@ services:
       - ./data:/app/data
     environment:
       - FLASK_ENV=production
+      - DATABASE_URL=postgresql://codeuser:codepass123@db:5432/codes_db
     restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
     healthcheck:
       test:
         - CMD
@@ -19,3 +38,6 @@ services:
       interval: 2s
       timeout: 10s
       retries: 10
+
+volumes:
+  postgres_data:
